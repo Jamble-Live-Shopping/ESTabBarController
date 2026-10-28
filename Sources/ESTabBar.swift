@@ -176,9 +176,12 @@ internal extension ESTabBar /* Layout */ {
             } .sorted { (subview1, subview2) -> Bool in
                 return subview1.frame.origin.x < subview2.frame.origin.x
         }
-        
+
+        // iOS 27 SDK: the adaptive tab bar no longer exposes UITabBarButton subviews.
+        let hasSystemButtons = tabBarButtons.count >= tabBarItems.count && tabBarButtons.count >= containers.count
+
         if isCustomizing {
-            for (idx, _) in tabBarItems.enumerated() {
+            for (idx, _) in tabBarItems.enumerated() where idx < tabBarButtons.count {
                 tabBarButtons[idx].isHidden = false
                 moreContentView?.isHidden = true
             }
@@ -186,7 +189,7 @@ internal extension ESTabBar /* Layout */ {
                 container.isHidden = true
             }
         } else {
-            for (idx, item) in tabBarItems.enumerated() {
+            for (idx, item) in tabBarItems.enumerated() where idx < tabBarButtons.count {
                 if let _ = item as? ESTabBarItem {
                     tabBarButtons[idx].isHidden = true
                 } else {
@@ -211,12 +214,20 @@ internal extension ESTabBar /* Layout */ {
             }
         }
         
-        if layoutBaseSystem {
+        if layoutBaseSystem && hasSystemButtons {
             // System itemPositioning
             for (idx, container) in containers.enumerated(){
                 if !tabBarButtons[idx].frame.isEmpty {
                     container.frame = tabBarButtons[idx].frame
                 }
+            }
+        } else if layoutBaseSystem {
+            // No system buttons to follow: split the bar evenly above the safe area
+            guard !containers.isEmpty else { return }
+            let height = bounds.size.height - safeAreaInsets.bottom
+            let eachWidth = bounds.size.width / CGFloat(containers.count)
+            for (idx, container) in containers.enumerated() {
+                container.frame = CGRect(x: eachWidth * CGFloat(idx), y: 0, width: eachWidth, height: height)
             }
         } else {
             // Custom itemPositioning
