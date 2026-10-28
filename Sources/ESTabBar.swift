@@ -178,7 +178,13 @@ internal extension ESTabBar /* Layout */ {
         }
 
         // iOS 27 SDK: the adaptive tab bar no longer exposes UITabBarButton subviews.
+        // It draws its items and selection pill in a single platter view instead, so hide it.
         let hasSystemButtons = tabBarButtons.count >= tabBarItems.count && tabBarButtons.count >= containers.count
+        if let platterClass = NSClassFromString("_UITabBarItemPlatterView") {
+            for subview in subviews where subview.isKind(of: platterClass) {
+                subview.isHidden = !isCustomizing
+            }
+        }
 
         if isCustomizing {
             for (idx, _) in tabBarItems.enumerated() where idx < tabBarButtons.count {
