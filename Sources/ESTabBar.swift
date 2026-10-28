@@ -181,7 +181,7 @@ internal extension ESTabBar /* Layout */ {
         // It draws its items and selection pill in a single platter view instead, so fade it out
         // (UIKit resets isHidden on it, alpha survives).
         let hasSystemButtons = tabBarButtons.count >= tabBarItems.count && tabBarButtons.count >= containers.count
-        if let platterClass = NSClassFromString("_UITabBarItemPlatterView") {
+        if let platterClass = NSClassFromString("UIKit._UITabBarItemPlatterView") ?? NSClassFromString("_UITabBarItemPlatterView") {
             for subview in subviews where subview.isKind(of: platterClass) {
                 subview.alpha = isCustomizing ? 1 : 0
             }
@@ -347,7 +347,9 @@ internal extension ESTabBar /* Actions */ {
     
     @objc func select(itemAtIndex idx: Int, animated: Bool) {
         let newIndex = max(0, idx)
-        let currentIndex = (selectedItem != nil) ? (items?.firstIndex(of: selectedItem!) ?? -1) : -1
+        // iOS 27 SDK: UIKit moves selectedItem to the new item before this runs, so trust the custom selection first.
+        let customSelectedIndex = items?.firstIndex { ($0 as? ESTabBarItem)?.contentView.selected == true }
+        let currentIndex = customSelectedIndex ?? ((selectedItem != nil) ? (items?.firstIndex(of: selectedItem!) ?? -1) : -1)
         guard newIndex < items?.count ?? 0, let item = self.items?[newIndex], item.isEnabled == true else {
             return
         }
@@ -372,15 +374,16 @@ internal extension ESTabBar /* Actions */ {
             return
         }
         
-        if currentIndex != newIndex {
-            if currentIndex != -1 && currentIndex < items?.count ?? 0{
+        let isReselect = currentIndex == newIndex && ((item as? ESTabBarItem)?.contentView.selected ?? true)
+        if !isReselect {
+            if currentIndex != -1 && currentIndex != newIndex && currentIndex < items?.count ?? 0{
                 if let currentItem = items?[currentIndex] as? ESTabBarItem {
                     currentItem.contentView.deselect(animated: animated, completion: nil)
                 } else if self.isMoreItem(currentIndex) {
                     moreContentView?.deselect(animated: animated, completion: nil)
                 }
             }
-            // iOS 27 SDK: selectedItem no longer tracks the custom selection, so clear any stale one.
+            // Clear any other custom item still drawn as selected.
             for (otherIndex, other) in (items ?? []).enumerated() where otherIndex != newIndex && otherIndex != currentIndex {
                 if let other = other as? ESTabBarItem, other.contentView.selected {
                     other.contentView.deselect(animated: animated, completion: nil)
@@ -391,7 +394,7 @@ internal extension ESTabBar /* Actions */ {
             } else if self.isMoreItem(newIndex) {
                 moreContentView?.select(animated: animated, completion: nil)
             }
-        } else if currentIndex == newIndex {
+        } else {
             if let item = item as? ESTabBarItem {
                 item.contentView.reselect(animated: animated, completion: nil)
             } else if self.isMoreItem(newIndex) {
